@@ -1,0 +1,336 @@
+# ============================================================
+# Curso: Técnico em Informática
+# Ano: 2026
+# Turma: 2º Ano B
+# Disciplina: Modelagem de Sistemas
+# Integrantes: Élissa Sales, Letícia Vargas, Luize Maria, Windelson Vertus
+# Projeto: Aplicativo Penhas - Implementação do Diagrama de Classes
+# ============================================================
+
+from abc import ABC, abstractmethod
+from datetime import datetime
+from typing import List, Optional
+
+
+class Usuario(ABC):
+    def __init__(self, nome: str, email: str, senha: str, telefone: str):
+        self.nome = nome
+        self.email = email
+        self.senha = senha
+        self.telefone = telefone
+
+    def login(self) -> bool:
+        """Realiza o login do usuário."""
+        return bool(self.email and self.senha)
+
+    def recuperarSenha(self) -> None:
+        """Simula a recuperação de senha."""
+        print(f"Solicitação de recuperação enviada para {self.email}.")
+
+
+class Usuaria(Usuario):
+    def __init__(
+        self,
+        nome: str,
+        email: str,
+        senha: str,
+        telefone: str,
+        cpf: str,
+        id: int,
+        localizacao: Optional[str] = None
+    ):
+        super().__init__(nome, email, senha, telefone)
+        self.cpf = cpf
+        self.id = id
+        self.localizacao = localizacao
+
+        # ASSOCIAÇÃO: uma Usuaria pode possuir 0..* ContatoDeConfianca.
+        self.contatos: List[ContatoDeConfianca] = []
+
+        # ASSOCIAÇÃO: uma Usuaria pode possuir 0..* registros de BotaoDePanico.
+        self.historico: List[BotaoDePanico] = []
+
+        # COMPOSIÇÃO: a Usuaria possui 1 EnderecoFixo, criado junto com ela.
+        self.enderecoFixo: Optional[EnderecoFixo] = None
+
+        # ASSOCIAÇÃO: a Usuaria pode possuir 0..* GravacaoAudio.
+        self.gravacoes: List[GravacaoAudio] = []
+
+        # ASSOCIAÇÃO: a Usuaria possui 1 BotaoDePanico.
+        self.botaoDePanico = BotaoDePanico()
+
+    def acionarPanico(self) -> None:
+        self.botaoDePanico.acionar()
+        self.botaoDePanico.enviarAlerta()
+        self.historico.append(self.botaoDePanico)
+
+    def iniciarGravacao(self) -> "GravacaoAudio":
+        gravacao = GravacaoAudio()
+        gravacao.iniciarGravacao()
+        self.gravacoes.append(gravacao)
+        return gravacao
+
+    def getCpf(self) -> str:
+        return self.cpf
+
+    def setLocalizacao(self, localizacao) -> None:
+        """Aceita uma string ou um objeto Localizacao."""
+        if isinstance(localizacao, Localizacao):
+            self.localizacao = localizacao.obterEndereco()
+        else:
+            self.localizacao = str(localizacao)
+
+    def setEnderecoFixo(self, rua: str, numero: int, bairro: str, cep: str) -> None:
+        self.enderecoFixo = EnderecoFixo(rua, numero, bairro, cep)
+
+
+class ContatoDeConfianca(Usuario):
+    def __init__(
+        self,
+        nome: str,
+        email: str,
+        senha: str,
+        telefone: str,
+        afinidade: str
+    ):
+        super().__init__(nome, email, senha, telefone)
+        self.afinidade = afinidade
+
+    def receberAlerta(self) -> None:
+        print(f"{self.nome} recebeu um alerta de emergência.")
+
+    def confirmarRecebimento(self) -> None:
+        print(f"{self.nome} confirmou o recebimento do alerta.")
+
+
+class GravacaoAudio:
+    def __init__(
+        self,
+        arquivo: str = "",
+        duracao: int = 0,
+        dataHora: Optional[datetime] = None
+    ):
+        self.arquivo = arquivo
+        self.duracao = duracao
+        self.dataHora = dataHora
+
+    def iniciarGravacao(self) -> None:
+        self.dataHora = datetime.now()
+        print("Gravação de áudio iniciada.")
+
+    def encerrarGravacao(self) -> None:
+        print("Gravação de áudio encerrada.")
+
+    def enviarAudio(self) -> None:
+        print(f"Áudio '{self.arquivo}' enviado.")
+
+
+class ServicoArmazenamento:
+    def __init__(self, capacidade: float = 0.0, tamanho: float = 0.0):
+        self.capacidade = capacidade
+        self.tamanho = tamanho
+        self.arquivos: List[GravacaoAudio] = []
+
+    def salvarAudio(self, audio: GravacaoAudio) -> None:
+        if audio not in self.arquivos:
+            self.arquivos.append(audio)
+            self.tamanho += audio.duracao
+            print("Áudio salvo no armazenamento.")
+
+    def removerAudio(self, audio: GravacaoAudio) -> None:
+        if audio in self.arquivos:
+            self.arquivos.remove(audio)
+            self.tamanho = max(0.0, self.tamanho - audio.duracao)
+            print("Áudio removido do armazenamento.")
+
+    def enviarAudio(self, audio: GravacaoAudio) -> None:
+        audio.enviarAudio()
+
+
+class Localizacao:
+    def __init__(
+        self,
+        latitude: float = 0.0,
+        longitude: float = 0.0,
+        endereco: str = ""
+    ):
+        self.latitude = latitude
+        self.longitude = longitude
+        self.endereco = endereco
+
+    def capturarLocalizacao(self) -> None:
+        print(
+            f"Localização capturada: "
+            f"latitude={self.latitude}, longitude={self.longitude}"
+        )
+
+    def obterEndereco(self) -> str:
+        return self.endereco
+
+
+class BotaoDePanico:
+    def __init__(
+        self,
+        dataHora: Optional[datetime] = None,
+        notificacaoAlerta: str = "",
+        status: str = "inativo",
+        localizacao: Optional[Localizacao] = None
+    ):
+        self.DataHora = dataHora
+        self.NotificacaoAlerta = notificacaoAlerta
+        self.status = status
+
+        # COMPOSIÇÃO: cada BotaoDePanico possui 1 Localizacao.
+        self.localizacao = localizacao if localizacao else Localizacao()
+
+    def acionar(self) -> None:
+        self.DataHora = datetime.now()
+        self.status = "ativo"
+        print("Botão de pânico acionado.")
+
+    def cancelar(self) -> None:
+        self.status = "cancelado"
+        print("Botão de pânico cancelado.")
+
+    def enviarAlerta(self) -> None:
+        self.NotificacaoAlerta = "Alerta de emergência enviado."
+        print(self.NotificacaoAlerta)
+
+    def registrarHistorico(self) -> "HistoricoEmergencia":
+        return HistoricoEmergencia(
+            id=0,
+            dataHora=self.DataHora or datetime.now(),
+            tipoDeEmergencia="Botão de pânico"
+        )
+
+
+class CentralDeEmergencia190:
+    def __init__(self):
+        self.numero = "190"
+
+    def realizarLigacao(self) -> None:
+        print(f"Ligando para a central de emergência {self.numero}...")
+
+    def cancelarLigacao(self) -> None:
+        print(f"Ligação para {self.numero} cancelada.")
+
+
+class EnderecoFixo:
+    def __init__(self, rua: str, numero: int, bairro: str, cep: str):
+        self.rua = rua
+        self.numero = numero
+        self.bairro = bairro
+        self.cep = cep
+
+    def capturarLocalizacaoFixa(self) -> None:
+        print(
+            f"Endereço fixo: {self.rua}, {self.numero} - "
+            f"{self.bairro} - CEP {self.cep}"
+        )
+
+    def obterEndereco(self) -> str:
+        return f"{self.rua}, {self.numero} - {self.bairro} - CEP {self.cep}"
+
+
+class HistoricoEmergencia:
+    registros: List["HistoricoEmergencia"] = []
+
+    def __init__(
+        self,
+        id: int,
+        dataHora: datetime,
+        tipoDeEmergencia: str
+    ):
+        self.id = id
+        self.dataHora = dataHora
+        self.tipoDeEmergencia = tipoDeEmergencia
+
+    def listar(self) -> List["HistoricoEmergencia"]:
+        return self.registros
+
+    def filtrar(
+        self,
+        dataInicial: datetime,
+        dataFinal: datetime
+    ) -> List["HistoricoEmergencia"]:
+        return [
+            registro for registro in self.registros
+            if dataInicial <= registro.dataHora <= dataFinal
+        ]
+
+
+# ============================================================
+# TESTE E INTEGRAÇÃO DAS CLASSES
+# ============================================================
+
+if __name__ == "__main__":
+    # Criação da usuária
+    usuaria = Usuaria(
+        nome="Maria",
+        email="maria@email.com",
+        senha="1234",
+        telefone="99999-9999",
+        cpf="000.000.000-00",
+        id=1
+    )
+
+    # ASSOCIAÇÃO: Usuaria 1 ---- 0..* ContatoDeConfianca.
+    contato = ContatoDeConfianca(
+        nome="Ana",
+        email="ana@email.com",
+        senha="5678",
+        telefone="98888-8888",
+        afinidade="Amiga"
+    )
+    usuaria.contatos.append(contato)
+
+    # COMPOSIÇÃO: Usuaria 1 ---- 1 EnderecoFixo.
+    usuaria.setEnderecoFixo(
+        rua="Rua das Flores",
+        numero=100,
+        bairro="Centro",
+        cep="76800-000"
+    )
+
+    # ASSOCIAÇÃO: Usuaria 1 ---- 0..* GravacaoAudio.
+    gravacao = usuaria.iniciarGravacao()
+    gravacao.arquivo = "emergencia_01.mp3"
+    gravacao.duracao = 30
+    gravacao.encerrarGravacao()
+
+    # ASSOCIAÇÃO: GravacaoAudio 1 ---- 1 ServicoArmazenamento.
+    armazenamento = ServicoArmazenamento(capacidade=1000)
+    armazenamento.salvarAudio(gravacao)
+    armazenamento.enviarAudio(gravacao)
+
+    # COMPOSIÇÃO: BotaoDePanico 1 ---- 1 Localizacao.
+    localizacao = Localizacao(
+        latitude=-8.7619,
+        longitude=-63.9039,
+        endereco="Porto Velho - RO"
+    )
+    usuaria.botaoDePanico.localizacao = localizacao
+    localizacao.capturarLocalizacao()
+
+    # ASSOCIAÇÃO: Localizacao 0..1 ---- 1 CentralDeEmergencia190.
+    central = CentralDeEmergencia190()
+    central.realizarLigacao()
+
+    # ASSOCIAÇÃO: BotaoDePanico 1 ---- 0..* HistoricoEmergencia.
+    usuaria.acionarPanico()
+    registro = usuaria.botaoDePanico.registrarHistorico()
+    HistoricoEmergencia.registros.append(registro)
+
+    # Teste dos métodos
+    contato.receberAlerta()
+    contato.confirmarRecebimento()
+
+    usuaria.setLocalizacao(localizacao)
+    print("CPF:", usuaria.getCpf())
+    print("Localização da usuária:", usuaria.localizacao)
+    print("Endereço fixo:", usuaria.enderecoFixo.obterEndereco())
+
+    historico = HistoricoEmergencia(0, datetime.now(), "Consulta")
+    print("Quantidade de registros:", len(historico.listar()))
+
+    central.cancelarLigacao()
